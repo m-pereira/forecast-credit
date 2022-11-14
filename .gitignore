@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+<<<<<<< HEAD
 .csv
 .xlsx
 *.csv
@@ -12,3 +13,5 @@
 *.zip
 .RDS
 *.RDS
+=======
+>>>>>>> ae1eb6bb1fa22d3cd08649ca8177a3b0fed38f66
