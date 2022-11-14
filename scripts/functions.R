@@ -49,8 +49,7 @@ df <- df %>%
   tibble()
 return(df)
 }
-my_tbl <- 
-formating(my_tbl)
+
 
 clean_date <- function(df,column_date){
   require(tidyr)
@@ -65,10 +64,12 @@ clean_date <- function(df,column_date){
           col = "data_ref",c("dia","mes","ano"),
           sep = "/",
           remove = TRUE) %>% 
-    mutate(data_ref = as.Date(data_ref,format = "%d/%m/%Y"))
+    mutate(data_ref = as.Date(data_ref,format = "%d/%m/%Y")) %>% 
+    select(-{{ column_date }})
   return(df)
 }
-clean_date(my_tbl,x_data_base)
+
+
 
 aggregate_uf <- function(df,cod_ibge,data_ref){
   require(dplyr)
@@ -76,12 +77,14 @@ aggregate_uf <- function(df,cod_ibge,data_ref){
     group_by({{ cod_ibge }},{{ data_ref }}) %>%
     summarise_if(is.numeric,sum) %>%
     mutate(uf = substr({{ cod_ibge }},1,2)) %>%
+    ungroup() %>% 
+    select(-{{ cod_ibge }}) %>% 
     group_by(uf,{{ data_ref }}) %>% 
     summarise_if(is.numeric,sum) %>% 
-    filter(uf > 0)
+    filter(uf > 0) 
   return(df)
   
 }
-aggregate_uf(my_tbl,codmun_ibge,x_data_base) 
+
 
 
