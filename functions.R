@@ -23,7 +23,7 @@ importing_estban <- function(n_meses){
              full.names = TRUE)  %>% 
     walk(~ unzip(.,exdir = "data/zip/"))
   
-  tbl <- list.files(path = "./data/zip",
+  my_tbl <- list.files(path = "./data/zip",
                     pattern =  "*.CSV",
                     full.names = TRUE) %>%
     map_df(~read.csv(.,header = TRUE,
@@ -31,8 +31,57 @@ importing_estban <- function(n_meses){
   do.call(file.remove, 
           list(list.files(path = here::here("data","zip"), 
                           full.names = TRUE)))
-  saveRDS(tbl,file = here::here("data","raw","estban.RDS"))  
+  saveRDS(my_tbl,file = here::here("data","raw","estban.RDS"))  
   }
 
+
+formating <- function(df){
+  require("dplyr")
+  require("janitor")
+  
+df <- df %>% 
+  clean_names() %>%
+  mutate_if(is.numeric,tidyr::replace_na,replace = 0) %>% 
+  transmute(
+    x_data_base,codmun_ibge,
+    credito = verbete_160_operacoes_de_credito
+  ) %>% 
+  tibble()
+return(df)
+}
+my_tbl <- 
+formating(my_tbl)
+
+clean_date <- function(df,column_date){
+  require(tidyr)
+  df <- 
+  df %>% 
+    mutate(
+      ano = (substr(as.character({{ column_date }}),1,4)),
+      mes = (substr(as.character({{ column_date }}),5,6)),
+      dia = 01 
+    ) %>% 
+    unite(.,
+          col = "data_ref",c("dia","mes","ano"),
+          sep = "/",
+          remove = TRUE) %>% 
+    mutate(data_ref = as.Date(data_ref,format = "%d/%m/%Y"))
+  return(df)
+}
+clean_date(my_tbl,x_data_base)
+
+aggregate_uf <- function(df,cod_ibge,data_ref){
+  require(dplyr)
+  df <- df %>% 
+    group_by({{ cod_ibge }},{{ data_ref }}) %>%
+    summarise_if(is.numeric,sum) %>%
+    mutate(uf = substr({{ cod_ibge }},1,2)) %>%
+    group_by(uf,{{ data_ref }}) %>% 
+    summarise_if(is.numeric,sum) %>% 
+    filter(uf > 0)
+  return(df)
+  
+}
+aggregate_uf(my_tbl,codmun_ibge,x_data_base) 
 
 
