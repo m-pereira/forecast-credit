@@ -1,45 +1,44 @@
 # global methods with tune
+library(tidyverse)  # loading dplyr, tibble, ggplot2, .. dependencies
+library(timetk)  # using timetk plotting, diagnostics and augment operations
+library(tsibble)  # for month to Date conversion
+library(tsibbledata)  # for aus_retail dataset
+library(fastDummies)  # for dummyfying categorical variables
 
 library(tidyverse)
 library(timetk)
 library(tidymodels)
 my_tbl_uf <- 
-  readRDS( here::here("data","cleaned.RDS"))  
+  readRDS(here::here("data","cleaned.RDS"))%>% ungroup()  
+total_uf <- my_tbl_uf %>% pull(uf) %>% unique()
+total_uf %>% length()
 
-
-
-groups <- lapply(X = 1:length(total_mun), 
-                 FUN = function(x) {
-                   credito %>%
-                     filter(uf == total_mun[x]) %>%
-                     arrange(data_ref) %>%
-                     mutate(credito = log1p(x = credito)) %>%
-                     mutate(credito = standardize_vec(credito)) %>%
-                     future_frame(data_ref, .length_out = "12 months", .bind_data = TRUE) %>%
-                     mutate(uf = total_mun[x]) %>%
-                     step_timeseries_signature(data_ref) %>%
-                     step_rm(data_ref) %>%
-                     step_zv(all_predictors()) %>%
-                     step_dummy(all_nominal_predictors(), 
-                                one_hot = TRUE) %>%
-                     step_rm(matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
-                     #    step_rm(matches("lbl")) %>%
-                     # adicionando serie de fourier aos dados
-                     tk_augment_fourier(.date_var = data_ref, .periods = 12, .K = 1) %>%
-                     # adicionando lags ao modelo
-                     tk_augment_lags(.value = credito, .lags = c(12)) %>%
-                     tk_augment_slidify(
-                       .value = credito_lag12,
-                       .f = ~ mean(.x, na.rm = TRUE),
-                       .period = c(12),
-                       .partial = TRUE,
-                       .align = "center"
-                     ) 
+groups <- lapply(X = 1:length(total_uf), 
+FUN = function(x) {
+ my_tbl_uf %>%
+   filter(uf == total_uf[x]) %>%
+   arrange(data_ref) %>%
+   mutate(credito = log1p(x = credito)) %>%
+   mutate(credito = standardize_vec(credito)) %>%
+   future_frame(data_ref, .length_out = "12 months",
+                .bind_data = TRUE) %>%
+   mutate(uf = total_uf[x]) %>%
+   tk_augment_timeseries_signature(data_ref) %>%
+   tk_augment_fourier(.date_var = data_ref,
+                      .periods = 12, .K = 1) %>%
+   #adicionando lags ao modelo
+   tk_augment_lags(.value = credito, .lags = c(6)) %>%
+   tk_augment_slidify(
+     .value = credito_lag6,
+     .f = ~ mean(.x, na.rm = TRUE),
+     .period = c(6),
+     .partial = TRUE,
+     .align = "center"
+   )
                  })
-
 groups_fe_tbl <- bind_rows(groups) %>%
   rowid_to_column(var = "rowid")
-#groups |> View()
+groups_fe_tbl %>% glimpse()
 
 ## future table -------------------
 
@@ -104,7 +103,12 @@ recipe_spec <- recipe(credito ~ .,
                       data = training(splits)
 ) %>%
   update_role(rowid, new_role = "indicator") %>%
+  step_rm(data_ref) %>% 
   step_other(uf) %>%
+  # step_zv(all_predictors()) %>%
+  # step_dummy(all_nominal_predictors(), 
+  #            one_hot = TRUE) #%>%
+  
   # step para adicionar dados de series temporais
   #step_timeseries_signature(data_ref) %>%
   #step_rm(matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
@@ -134,7 +138,7 @@ feature_engineering_artifacts_list <- list(
   data = list(
     data_prepared_tbl = data_prepared_tbl,
     future_tbl = future_tbl,
-    uf = total_mun
+    uf = total_uf
   ),
   
   # Recipes
@@ -188,6 +192,7 @@ wflw_fit_rf <- workflow() %>%
       set_engine("ranger")
   ) %>%
   add_recipe(recipe_spec %>%
+               
                step_rm(data_ref)) %>%
   fit(training(splits))
 toc()
@@ -2548,9 +2553,9 @@ plan(sequential)
 forecast_stacking_tbl |> names()
 forecast_stacking_tbl |> View()
 
-lforecasts <- lapply(X = 1:length(total_mun), FUN = function(x) {
+lforecasts <- lapply(X = 1:length(total_uf), FUN = function(x) {
   forecast_stacking_tbl %>%
-    filter(uf == total_mun[x]) %>%
+    filter(uf == total_uf[x]) %>%
     group_by(uf) %>%
     mutate(across(.value:.value,
                   .fns = ~ standardize_inv_vec(

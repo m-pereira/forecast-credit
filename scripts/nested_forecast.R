@@ -129,7 +129,7 @@ try_sample_tbl %>% extract_nested_error_report()
 ## scale------
 
 parallel_start(6)
-
+tic()
 nested_modeltime_tbl <-
   my_tbl_nest %>%
   modeltime_nested_fit(
@@ -144,31 +144,27 @@ nested_modeltime_tbl <-
       allow_par = TRUE
     )
   )
-### Finished in: 1.354141 hours.
-# nested_modeltime_tbl %>%
-# write_rds(here::here("train","processed","tbl.RDS"))
-# nested_modeltime_tbl
-# nested_modeltime_tbl %>%
-#   extract_nested_error_report()
-# nested_modeltime_tbl %>%
-#   extract_nested_error_report() |>
-#   pull(uf) |> unique() 
-# 
-# ## test accuracy ----
-# nested_modeltime_tbl
-# 
-# nested_modeltime_tbl %>%
-#   extract_nested_test_accuracy()  %>%
-#   table_modeltime_accuracy(.interactive = F)
-# 
-# nested_modeltime_tbl %>% 
-#   extract_nested_test_forecast() %>%
-#   filter(uf == 4314902) %>%
-#   group_by(uf) %>%
-#   plot_modeltime_forecast(
-#     .facet_ncol  = 2,
-#     .interactive = TRUE
-#   )
+toc()
+nested_modeltime_tbl %>%
+  write_rds(here::here("artifacts","trained-nested.RDS"))
+nested_modeltime_tbl %>%
+  extract_nested_error_report()
+
+## test accuracy ----
+nested_modeltime_tbl
+
+nested_modeltime_tbl %>%
+  extract_nested_test_accuracy()  %>%
+  table_modeltime_accuracy(.interactive = F)
+
+nested_modeltime_tbl %>%
+  extract_nested_test_forecast() %>%
+  filter(uf == 4314902) %>%
+  group_by(uf) %>%
+  plot_modeltime_forecast(
+    .facet_ncol  = 2,
+    .interactive = TRUE
+  )
 
 ## select best ----------------------------
 best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
@@ -206,28 +202,22 @@ nest_best_tbl_refit
 # review any errors
 
 # ## visualize
-# 
-# nest_best_tbl_refit %>%
-#   extract_nested_future_forecast() %>%
-#   group_by(uf) %>%
-#   plot_modeltime_forecast()
-# 
-# best_refit_models <- nest_best_tbl_refit %>%
-#   extract_nested_best_model_report()
-# best_refit_models
-# 
+
+nest_best_tbl_refit %>%
+  extract_nested_future_forecast() %>%
+  group_by(uf) %>%
+  plot_modeltime_forecast()
+
+best_refit_models <- nest_best_tbl_refit %>%
+  extract_nested_best_model_report()
+best_refit_models
 
 
-## basic forecast ----
-# forecast_tbl <-
-#   nest_best_tbl_refit %>%
-#   extract_nested_future_forecast()
-# 
-# forecast_tbl |> 
-#   saveRDS(here::here("data","forecast",
-#                      "credito_nested_local_36a.RDS"))
-# 
-# 
+
+# basic forecast ----
+forecast_tbl <-
+  nest_best_tbl_refit %>%
+  extract_nested_future_forecast()
 
 
 ## Ensemble -----------------
@@ -241,59 +231,55 @@ nested_ensemble_tbl_mean <-
   )
 nested_ensemble_tbl_mean
 
-nested_ensemble_tbl_mean |> 
-  saveRDS(here::here("data","forecast",
-                     "nested_local_credit_36a.RDS"))
-
 # 
-# ## select best
-# nested_ensemble_tbl_mean  %>% 
-#   extract_nested_test_accuracy() %>%
-#   group_by(uf) %>%
-#   table_modeltime_accuracy(.interactive = FALSE) 
+## select best
+nested_ensemble_tbl_mean  %>%
+  extract_nested_test_accuracy() %>%
+  group_by(uf) %>%
+  table_modeltime_accuracy(.interactive = FALSE)
 
 
-# 
-# best_nested_modeltime_tbl <- 
-#   nested_ensemble_tbl_mean %>%
-#   modeltime_nested_select_best(
-#     metric                = "rmse", 
-#     minimize              = TRUE, 
-#     filter_test_forecasts = TRUE
-#   )
-# 
-# extract_nested_best_model_report() %>%
-#   table_modeltime_accuracy(.interactive = FALSE)
-# 
-# best_nested_modeltime_tbl %>%
-#   extract_nested_test_forecast() %>%
-#   group_by(uf) %>%
-#   plot_modeltime_forecast(
-#     .facet_ncol  = 2,
-#     .interactive = FALSE
-#   )
+#
+best_nested_modeltime_tbl <-
+  nested_ensemble_tbl_mean %>%
+  modeltime_nested_select_best(
+    metric                = "rmse",
+    minimize              = TRUE,
+    filter_test_forecasts = TRUE
+  )
+
+extract_nested_best_model_report() %>%
+  table_modeltime_accuracy(.interactive = FALSE)
+
+best_nested_modeltime_tbl %>%
+  extract_nested_test_forecast() %>%
+  group_by(uf) %>%
+  plot_modeltime_forecast(
+    .facet_ncol  = 2,
+    .interactive = FALSE
+  )
 
 
 # forecast -----------------------
-# nested_modeltime_refit_tbl <- nested_ensemble_tbl_mean %>%
-#   modeltime_nested_refit(
-#     control = control_nested_refit(verbose = TRUE)
-#   )
-# 
-# nested_modeltime_refit_tbl
-# nested_modeltime_refit_tbl %>%
-#   extract_nested_future_forecast() %>%
-#   group_by(uf) %>%
-#   plot_modeltime_forecast(
-#     .interactive = TRUE,
-#     .facet_ncol  = 2
-#   )
+nested_modeltime_refit_tbl <- nested_ensemble_tbl_mean %>%
+  modeltime_nested_refit(
+    control = control_nested_refit(verbose = TRUE)
+  )
+
+nested_modeltime_refit_tbl
+nested_modeltime_refit_tbl %>%
+  extract_nested_future_forecast() %>%
+  group_by(uf) %>%
+  plot_modeltime_forecast(
+    .interactive = TRUE,
+    .facet_ncol  = 2
+  )
 
 my_forecast <- 
   nested_ensemble_tbl_mean %>%
   extract_nested_future_forecast()
 
-# my_forecast |> 
-#   saveRDS(here::here("data","forecast",
-#                      "credito_nested_local_refit_36a_2.RDS"))
-# 
+my_forecast |> 
+  saveRDS(here::here("data","artifacts",
+                     "nested-forecast.RDS"))
+
