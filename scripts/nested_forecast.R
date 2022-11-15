@@ -19,19 +19,19 @@ lag_roll_transformer <- function(data){
 }
 ## split data -------------
 my_tbl_nest <-
-  my_tbl %>%
-  #  group_by(codmun_ibge) %>%
+  my_tbl_uf %>%
+  #  group_by(uf) %>%
   extend_timeseries(
-    .id_var = codmun_ibge,
+    .id_var = uf,
     .date_var = data_ref,
     .length_future = FORECAST_HORIZON
   ) %>%
   nest_timeseries(
-    .id_var = codmun_ibge,
+    .id_var = uf,
     .length_future = FORECAST_HORIZON
   ) %>%
   split_nested_timeseries(
-    .length_test = 12
+    .length_test = 6
   )
 
 my_tbl_nest
@@ -41,7 +41,7 @@ my_tbl_nest
 # modelling ------------
 ## recipes
 recipe1 <- recipe(
-  valor ~ data_ref,
+  credito ~ data_ref,
   extract_nested_train_split(my_tbl_nest)
 )
 recipe1
@@ -70,7 +70,7 @@ wflw_prophet <- workflow() %>%
     prophet_reg("regression") %>%
       set_engine("prophet")
   ) %>%
-  add_recipe(recipe(valor ~ ., extract_nested_train_split(my_tbl_nest)))
+  add_recipe(recipe(credito ~ ., extract_nested_train_split(my_tbl_nest)))
 
 ## arima
 wflw_arima <- workflow() %>%
@@ -78,14 +78,14 @@ wflw_arima <- workflow() %>%
     arima_reg(seasonal_period = 12) %>%
       set_engine("auto_arima")
   ) %>%
-  add_recipe(recipe(valor ~ ., extract_nested_train_split(my_tbl_nest)))
+  add_recipe(recipe(credito ~ ., extract_nested_train_split(my_tbl_nest)))
 # arima boost
 # wflw_arima_boost <- workflow() %>%
 #   add_model(
 #     arima_boost(seasonal_period = 12) %>%
 #       set_engine("auto_arima_xgboost")
 #   ) %>%
-#   add_recipe(recipe(valor ~ .,
+#   add_recipe(recipe(credito ~ .,
 #                     extract_nested_train_split(my_tbl_nest)))
 
 
@@ -97,7 +97,7 @@ wflw_ets <-
     exp_smoothing() %>%
       set_engine("ets")
   ) %>%
-  add_recipe(recipe(valor ~ ., extract_nested_train_split(my_tbl_nest)))
+  add_recipe(recipe(credito ~ ., extract_nested_train_split(my_tbl_nest)))
 
 
 
@@ -152,7 +152,7 @@ nested_modeltime_tbl <-
 #   extract_nested_error_report()
 # nested_modeltime_tbl %>%
 #   extract_nested_error_report() |>
-#   pull(codmun_ibge) |> unique() 
+#   pull(uf) |> unique() 
 # 
 # ## test accuracy ----
 # nested_modeltime_tbl
@@ -163,8 +163,8 @@ nested_modeltime_tbl <-
 # 
 # nested_modeltime_tbl %>% 
 #   extract_nested_test_forecast() %>%
-#   filter(codmun_ibge == 4314902) %>%
-#   group_by(codmun_ibge) %>%
+#   filter(uf == 4314902) %>%
+#   group_by(uf) %>%
 #   plot_modeltime_forecast(
 #     .facet_ncol  = 2,
 #     .interactive = TRUE
@@ -209,7 +209,7 @@ nest_best_tbl_refit
 # 
 # nest_best_tbl_refit %>%
 #   extract_nested_future_forecast() %>%
-#   group_by(codmun_ibge) %>%
+#   group_by(uf) %>%
 #   plot_modeltime_forecast()
 # 
 # best_refit_models <- nest_best_tbl_refit %>%
@@ -249,7 +249,7 @@ nested_ensemble_tbl_mean |>
 # ## select best
 # nested_ensemble_tbl_mean  %>% 
 #   extract_nested_test_accuracy() %>%
-#   group_by(codmun_ibge) %>%
+#   group_by(uf) %>%
 #   table_modeltime_accuracy(.interactive = FALSE) 
 
 
@@ -267,7 +267,7 @@ nested_ensemble_tbl_mean |>
 # 
 # best_nested_modeltime_tbl %>%
 #   extract_nested_test_forecast() %>%
-#   group_by(codmun_ibge) %>%
+#   group_by(uf) %>%
 #   plot_modeltime_forecast(
 #     .facet_ncol  = 2,
 #     .interactive = FALSE
@@ -283,7 +283,7 @@ nested_ensemble_tbl_mean |>
 # nested_modeltime_refit_tbl
 # nested_modeltime_refit_tbl %>%
 #   extract_nested_future_forecast() %>%
-#   group_by(codmun_ibge) %>%
+#   group_by(uf) %>%
 #   plot_modeltime_forecast(
 #     .interactive = TRUE,
 #     .facet_ncol  = 2

@@ -1,36 +1,62 @@
 # 01 EXPLORING BASICS --------------------
+## bibliotecas usadas para exploração
 library(tidyverse)
 library(timetk)
 library(tidymodels)
+# importar dados por UF
 my_tbl_uf <- 
   readRDS( here::here("data","cleaned.RDS"))  
 my_tbl_uf %>% glimpse()
+# agrupar o mercado para entender o mercado de crédito do Brasil
 my_tbl <- my_tbl_uf %>% 
   group_by(data_ref) %>% 
   summarise(credito = sum(credito))
+## limitar algumas UFs pra visualização dos dados
 my_tbl_uf <- my_tbl_uf %>% 
   filter(uf %in% c("35","33","43","41","51","27"))
+
+###  como é nossa série temporal?
+# é possível ver alguns picos e uma clara tendência 
 my_tbl %>% 
   plot_time_series(data_ref,credito)
 
+
+### destrinchando por UF 
 my_tbl_uf %>% 
   group_by(uf) %>% 
   plot_time_series(data_ref,credito,
                    .facet_ncol = 3,
                    .interactive = FALSE)
 
-## sazonalidade
+## buscando visualizar sazonalidade, aparentemente temos
+## algum tipo de sazonalidade em julho e agosto com picos menores
+
 my_tbl %>% 
   plot_seasonal_diagnostics(data_ref,credito)
-# anomalias
+
+
+## em termos de anomalias, os últimos meses parecem ser mais importantes
+## é o papel do cientisa de dados entender as anomalias
+## como conheço bem a fonte de dados, sei que isso 
+## é porque os bancos tem até uns 60 dias para atualizar os
+## dados no ESTBAN, então é normal os dados mais recentes
+## não ter confiáveis
+
 my_tbl %>% 
   plot_anomaly_diagnostics(data_ref,credito)
 
-## ACF
+## A ACF apresenta uma queda lenta, enquanto a PACF
+## uma queda brusca. Isso é um comportamento autorregressivo
+## O primeiro lag provavelmente vai ser significativo em um
+## modelo ARIMA
 my_tbl %>% 
   plot_acf_diagnostics(data_ref,credito)
 
-## modelo linear funciona?
+## Temos alguma ideia sobre nossa série, mas será que um modelo
+## linear ajusta bem? Pra isso vamos criar algumas features
+## clássicas, baseadas na série temporal. Desde features clássicas,
+## até diferenças, defasagens e médias móveis
+
 signature_series <- 
   my_tbl %>% 
   tk_augment_timeseries_signature(data_ref) %>% 
@@ -41,38 +67,49 @@ signature_series <-
     .period = 3,
     .partial = TRUE,
     .align = "center"
-  )
+  ) 
+
+## como o tk_agument cria muitas features, vamos remover algumas
+## que não fazem sentido. Os dados são mensais, então features
+## semanais não tem valor algum.
+signature_series %>% names()
+contain <- c("wday","week","day","minute",
+             "second","hour","am.pm")
+
+## O modelo de regressão ajusta relativamente bem, 
+## provavelmente vamos conseguir ajustar modelos simples
+## que façam boas previsões
+
+
 signature_series %>% 
+  select(-contains(contain)) %>% 
   plot_time_series_regression(
     .date_var = data_ref,
-    .formula = credito ~.
+    .formula = credito ~.,
+    .show_summary = TRUE
   )
 
+## o que aprendemos na exploração?
+## A série tem tendência
+## possui algum tipo de sazonalidade
+## possui componentes autorregressivos
+## tem uma anomalia nas duas últimas observações, 
+## devido a erros de coleta
 
-
-
+## Conclusão: Um modelo simples é capaz de realizar a previsão
 
 # 02 FEATURE ENGINEERING WITH RECIPES---------------
+## deveríamos remover essas observações, mas vou deixar
+## porque coletei poucos dados
+#my_tbl <- 
+# my_tbl %>% 
+#   filter(data_ref < as.Date("2022-06-02"))
 
 my_tbl_sig <- 
   my_tbl %>%
   arrange(data_ref) %>%
-  future_frame(data_ref, 
-               .length_out = "14 months", 
+  future_frame(data_ref, .length_out = "12 months", 
                .bind_data = TRUE) #%>%
-#lag_roll_transformer() 
-
-future_data <- my_tbl_sig %>%
-  filter(is.na(credito))
-
-
-my_tbl_sig <- my_tbl_sig %>% drop_na()
-
-
-my_tbl_sig <- 
-  my_tbl %>%
-  arrange(data_ref) %>%
-  future_frame(data_ref, .length_out = "12 months", .bind_data = TRUE) #%>%
 #lag_roll_transformer() 
 
 future_data <- my_tbl_sig %>%
@@ -85,7 +122,7 @@ my_tbl_sig <- my_tbl_sig %>% drop_na()
 
 splits <- my_tbl_sig %>%
   time_series_split(data_ref, 
-                    assess = "12 months", 
+                    assess = "6 months", 
                     cumulative = TRUE)
 
 
@@ -126,20 +163,29 @@ wflw_fit_prophet <- workflow() %>%
   add_recipe(recipe_spec) %>%
   fit(training(splits))
 toc()
+
+
 prophet_table <- 
   wflw_fit_prophet |> 
   modeltime_table()
 
+## o resíduo tem um comportamento diferente do esperado,
+## o modelo não ficou bom 
 prophet_table |> 
   modeltime_calibrate(new_data = testing(splits)) %>%
   modeltime_residuals() |> 
   plot_modeltime_residuals(.interactive = FALSE)
 
+## os testes estatísticos do resíduo confirmam
+## qe não tá bom o resíduo
 prophet_table |> 
   modeltime_calibrate(new_data = testing(splits)) %>%
   modeltime_residuals() |> 
   modeltime_residuals_test()
 
+## vamos ver como é a previsão?
+# O valor projetado extrapola e muito a previsão
+## esse modelo não ficou bom
 prophet_table |> 
   modeltime_calibrate(new_data = testing(splits)) %>%
   modeltime_forecast(
@@ -167,11 +213,18 @@ arima_table <-
   wflw_fit_arima |> 
   modeltime_table()
 
+## O resíduo do modelo arima parece estar em torno
+## de uma média próxima de zero, mas 
+##  nos últimos 2 meses ele erra feio, o que era esperado
+## então parece um resíduo bom
+
 arima_table |> 
   modeltime_calibrate(new_data = testing(splits)) %>%
   modeltime_residuals() |> 
   plot_modeltime_residuals(.interactive = FALSE)
 
+## Apesar do resíduo não ser normalmente distribuído,
+## o resíduo tem comportamento melhor
 arima_table |> 
   modeltime_calibrate(new_data = testing(splits)) %>%
   modeltime_residuals() |> 
@@ -229,42 +282,6 @@ ets_table |>
     keep_data     = TRUE) |>
   plot_modeltime_forecast()
 
-# nnetar ----------------------
-tic()
-wflw_fit_nnetar <-
-  workflow() %>%
-  add_model(
-    nnetar_reg(
-      mode = "regression"
-    ) %>%
-      set_engine("nnetar")
-  ) %>%
-  add_recipe(recipe_spec) %>%
-  fit(training(splits))
-toc()
-
-nnetar_table <- 
-  wflw_fit_nnetar |> 
-  modeltime_table()
-
-nnetar_table |> 
-  modeltime_calibrate(new_data = testing(splits)) %>%
-  modeltime_residuals() |> 
-  plot_modeltime_residuals(.interactive = FALSE)
-
-nnetar_table |> 
-  modeltime_calibrate(new_data = testing(splits)) %>%
-  modeltime_residuals() |> 
-  modeltime_residuals_test()
-
-nnetar_table |> 
-  modeltime_calibrate(new_data = testing(splits)) %>%
-  modeltime_forecast(
-    actual_data = my_tbl_sig,
-    new_data      = future_data,
-    keep_data     = TRUE) |>
-  plot_modeltime_forecast()
-
 
 #TBATS -----------------
 tic()
@@ -306,9 +323,9 @@ tbats_table |>
 
 ## modeltime table
 submodels_tbl <- modeltime_table(
-  wflw_fit_prophet,
+#  wflw_fit_prophet, # vou deixar o prophet de lado
   wflw_fit_arima,
- # wflw_fit_ets, ## não ficou bom
+  wflw_fit_ets, ## não ficou bom
   wflw_fit_tbats
 )
 
@@ -332,8 +349,7 @@ artifacts <- list(
   workflows = list(
     wflw_arima = wflw_fit_arima,
     wflw_ets = wflw_fit_ets,
-    wflw_prophet = wflw_fit_prophet,
-    #wflw_nnetar = wflw_fit_nnetar, ## não ficou bom
+#    wflw_prophet = wflw_fit_prophet,
     wflw_tbats = wflw_fit_tbats
   ),
   calibration = list(calibration_tbl = calibrated_wflws_tbl)
@@ -396,7 +412,6 @@ calibration_all_tbl %>%
   modeltime_accuracy(testing(splits)) %>%
   arrange(rmse)
 
-#### rolou algum overffiting ne fiote
 calibration_all_tbl %>%
   modeltime_accuracy(training(splits)) %>%
   arrange(rmse)

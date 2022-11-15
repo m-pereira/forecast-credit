@@ -11,12 +11,12 @@ my_tbl_uf <-
 groups <- lapply(X = 1:length(total_mun), 
                  FUN = function(x) {
                    credito %>%
-                     filter(codmun_ibge == total_mun[x]) %>%
+                     filter(uf == total_mun[x]) %>%
                      arrange(data_ref) %>%
-                     mutate(valor = log1p(x = valor)) %>%
-                     mutate(valor = standardize_vec(valor)) %>%
+                     mutate(credito = log1p(x = credito)) %>%
+                     mutate(credito = standardize_vec(credito)) %>%
                      future_frame(data_ref, .length_out = "12 months", .bind_data = TRUE) %>%
-                     mutate(codmun_ibge = total_mun[x]) %>%
+                     mutate(uf = total_mun[x]) %>%
                      step_timeseries_signature(data_ref) %>%
                      step_rm(data_ref) %>%
                      step_zv(all_predictors()) %>%
@@ -27,9 +27,9 @@ groups <- lapply(X = 1:length(total_mun),
                      # adicionando serie de fourier aos dados
                      tk_augment_fourier(.date_var = data_ref, .periods = 12, .K = 1) %>%
                      # adicionando lags ao modelo
-                     tk_augment_lags(.value = valor, .lags = c(12)) %>%
+                     tk_augment_lags(.value = credito, .lags = c(12)) %>%
                      tk_augment_slidify(
-                       .value = valor_lag12,
+                       .value = credito_lag12,
                        .f = ~ mean(.x, na.rm = TRUE),
                        .period = c(12),
                        .partial = TRUE,
@@ -53,12 +53,12 @@ groups_fe_tbl %>%
 
 ## salvando alguns parâmetros
 tmp <- credito %>%
-  group_by(codmun_ibge) %>%
+  group_by(uf) %>%
   arrange(data_ref) %>%
-  mutate(valor = log1p(x = valor)) %>%
+  mutate(credito = log1p(x = credito)) %>%
   group_map(~ c(
-    mean = mean(.x$valor, na.rm = TRUE),
-    sd = sd(.x$valor, na.rm = TRUE)
+    mean = mean(.x$credito, na.rm = TRUE),
+    sd = sd(.x$credito, na.rm = TRUE)
   )) %>%
   bind_rows()
 
@@ -68,11 +68,11 @@ std_sd <- tmp$sd
 
 #### splits --------
 data_prepared_tbl <- groups_fe_tbl %>%
-  filter(!is.na(valor)) %>%
+  filter(!is.na(credito)) %>%
   drop_na()
 
 future_tbl <- groups_fe_tbl %>%
-  filter(is.na(valor))
+  filter(is.na(credito))
 set.seed(34)
 splits <- data_prepared_tbl %>%
   time_series_split(data_ref,
@@ -90,21 +90,21 @@ splits %>%
 # validando os splits
 splits %>%
   tk_time_series_cv_plan() %>%
-  filter(codmun_ibge == mun_teste) %>%
+  filter(uf == mun_teste) %>%
   plot_time_series_cv_plan(
     .date_var = data_ref,
-    .value = valor,
+    .value = credito,
     .title = paste0("Split for ", mun_teste)
   )
 
 
 ##  recipe ----------------
 
-recipe_spec <- recipe(valor ~ .,
+recipe_spec <- recipe(credito ~ .,
                       data = training(splits)
 ) %>%
   update_role(rowid, new_role = "indicator") %>%
-  step_other(codmun_ibge) %>%
+  step_other(uf) %>%
   # step para adicionar dados de series temporais
   #step_timeseries_signature(data_ref) %>%
   #step_rm(matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(day)|(week)|(am.pm)")) %>%
@@ -121,7 +121,7 @@ juiced_ <-
   juice()
 juiced_ %>% glimpse()
 
-recipe(valor ~ ., data = training(splits)) %>%
+recipe(credito ~ ., data = training(splits)) %>%
   step_timeseries_signature(data_ref) %>%
   prep() %>%
   juice() %>%
@@ -134,7 +134,7 @@ feature_engineering_artifacts_list <- list(
   data = list(
     data_prepared_tbl = data_prepared_tbl,
     future_tbl = future_tbl,
-    codmun_ibge = total_mun
+    uf = total_mun
   ),
   
   # Recipes
@@ -476,10 +476,10 @@ resamples_kfold <- training(splits) %>%
 
 resamples_kfold %>%
   tk_time_series_cv_plan() %>%
-  filter(codmun_ibge == mun_teste) %>%
+  filter(uf == mun_teste) %>%
   plot_time_series_cv_plan(
     .date_var = data_ref,
-    .value = valor,
+    .value = credito,
     .facet_ncol = 2
   )
 
@@ -2419,7 +2419,7 @@ calibration_all_tbl %>%
     actual_data = artifacts$data$data_prepared_tbl,
     keep_data   = TRUE
   ) %>%
-  filter(codmun_ibge == mun_teste) %>%
+  filter(uf == mun_teste) %>%
   plot_modeltime_forecast(
     # .facet_ncol         = 4,
     .conf_interval_show = FALSE,
@@ -2550,8 +2550,8 @@ forecast_stacking_tbl |> View()
 
 lforecasts <- lapply(X = 1:length(total_mun), FUN = function(x) {
   forecast_stacking_tbl %>%
-    filter(codmun_ibge == total_mun[x]) %>%
-    group_by(codmun_ibge) %>%
+    filter(uf == total_mun[x]) %>%
+    group_by(uf) %>%
     mutate(across(.value:.value,
                   .fns = ~ standardize_inv_vec(
                     x = .,
@@ -2568,7 +2568,7 @@ lforecasts[[1]] |> View()
 forecast_stacking_tbl <- bind_rows(lforecasts)
 
 forecast_stacking_tbl %>%
-  group_by(codmun_ibge) %>%
+  group_by(uf) %>%
   plot_modeltime_forecast(
     .title = "Turnover 1-year forecast",
     .facet_ncol = 4,
