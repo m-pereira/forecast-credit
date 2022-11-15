@@ -1,6 +1,7 @@
 library(tidyverse)
 library(timetk)
 library(tidymodels)
+library(modeltime)
 my_tbl_uf <- 
   readRDS( here::here("data","cleaned.RDS"))  
 
@@ -31,7 +32,7 @@ my_tbl_nest <-
     .length_future = FORECAST_HORIZON
   ) %>%
   split_nested_timeseries(
-    .length_test = 6
+    .length_test = 12
   )
 
 my_tbl_nest
@@ -129,6 +130,7 @@ try_sample_tbl %>% extract_nested_error_report()
 ## scale------
 
 parallel_start(6)
+library(tictoc)
 tic()
 nested_modeltime_tbl <-
   my_tbl_nest %>%
@@ -145,8 +147,7 @@ nested_modeltime_tbl <-
     )
   )
 toc()
-nested_modeltime_tbl %>%
-  write_rds(here::here("artifacts","trained-nested.RDS"))
+#Finished in: 33.2733 secs.
 nested_modeltime_tbl %>%
   extract_nested_error_report()
 
@@ -159,7 +160,7 @@ nested_modeltime_tbl %>%
 
 nested_modeltime_tbl %>%
   extract_nested_test_forecast() %>%
-  filter(uf == 4314902) %>%
+  filter(uf == 11) %>%
   group_by(uf) %>%
   plot_modeltime_forecast(
     .facet_ncol  = 2,
@@ -183,6 +184,7 @@ report_nest_best_tbl <-
   nest_best_tbl %>%
   extract_nested_best_model_report()
 
+
 report_nest_best_tbl |> pull(.model_desc) |> table()
 
 ## visualize best models
@@ -198,6 +200,8 @@ nest_best_tbl_refit <-
     )
   )
 nest_best_tbl_refit
+nest_best_tbl_refit %>%
+  write_rds(here::here("artifacts","trained-nested.RDS"))
 
 # review any errors
 
@@ -230,8 +234,6 @@ nested_ensemble_tbl_mean <-
     keep_submodels = TRUE
   )
 nested_ensemble_tbl_mean
-
-# 
 ## select best
 nested_ensemble_tbl_mean  %>%
   extract_nested_test_accuracy() %>%
@@ -247,7 +249,7 @@ best_nested_modeltime_tbl <-
     minimize              = TRUE,
     filter_test_forecasts = TRUE
   )
-
+best_nested_modeltime_tbl %>% 
 extract_nested_best_model_report() %>%
   table_modeltime_accuracy(.interactive = FALSE)
 
@@ -274,12 +276,14 @@ nested_modeltime_refit_tbl %>%
     .interactive = TRUE,
     .facet_ncol  = 2
   )
-
+nested_modeltime_refit_tbl %>%
+  write_rds(here::here("artifacts","trained-nested-ensemble.RDS"))
+# 
 my_forecast <- 
   nested_ensemble_tbl_mean %>%
   extract_nested_future_forecast()
 
 my_forecast |> 
-  saveRDS(here::here("data","artifacts",
+  saveRDS(here::here("artifacts",
                      "nested-forecast.RDS"))
 
