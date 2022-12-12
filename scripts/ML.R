@@ -1154,6 +1154,6 @@ forecast_stacking_tbl %>%
 
 forecast_stacking_tbl |> 
   saveRDS(here::here(
-    "data",
-    "credito_forecast.RDS"))
+    "artifacts",
+    "credito_forecast_ml.RDS"))
 

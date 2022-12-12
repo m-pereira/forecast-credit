@@ -276,14 +276,11 @@ nested_modeltime_refit_tbl %>%
     .interactive = TRUE,
     .facet_ncol  = 2
   )
+
 nested_modeltime_refit_tbl %>%
   write_rds(here::here("artifacts","trained-nested-ensemble.RDS"))
-# 
-my_forecast <- 
-  nested_ensemble_tbl_mean %>%
-  extract_nested_future_forecast()
 
-my_forecast |> 
+nested_modeltime_refit_tbl %>%
+  extract_nested_future_forecast() %>% 
   saveRDS(here::here("artifacts",
-                     "nested-forecast.RDS"))
-
+                     "nested_forecast.RDS"))

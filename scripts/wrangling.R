@@ -4,7 +4,8 @@ source(here::here("scripts","functions.R"))
 ## importing_estban(36) 
 
 ## lendo no R o arquivore gerado
-my_tbl <- readRDS(here::here("data","raw","estban.RDS"))  %>% 
+my_tbl <- 
+  readRDS(here::here("data","raw","estban.RDS"))  %>% 
   # selecionando colunas de interesse
   formating() %>% 
   # limpando a coluna data
