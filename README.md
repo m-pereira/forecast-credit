@@ -29,5 +29,5 @@ Ainda explorando o mercado como um todo, estima-se um modelo linear simples, usa
 
 A previsão pelo ensemble de modelos é um mercado em que se recupera da queda que dos últimos dois meses observados, asism os modelos parecem captar a tendência da série do do mercado de crédito.
 
-![alt text](https://github.com/m-pereira/forecast-credit/blob/main/ts.png)
+![alt text](https://github.com/m-pereira/forecast-credit/blob/main/forecast-ensemble.png)
 
