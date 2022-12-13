@@ -8,6 +8,8 @@ library(tidymodels)
 library(modeltime)
 my_tbl_uf <- 
   readRDS(here::here("data","cleaned.RDS"))%>% ungroup()  
+
+
 total_uf <- my_tbl_uf %>% pull(uf) %>% unique()
 total_uf %>% length()
 
@@ -38,7 +40,6 @@ FUN = function(x) {
 groups_fe_tbl <- bind_rows(groups) %>%
   rowid_to_column(var = "rowid")
 groups_fe_tbl %>% glimpse()
-groups_fe_tbl %>% View()
 ## salvando alguns parâmetros
 tmp <- my_tbl_uf %>%
   group_by(uf) %>%
@@ -223,7 +224,7 @@ submodels_tbl <- modeltime_table(
 
 
 submodels_tbl
-
+submodels_tbl %>% write_rds(here::here("artifacts","submodels.RDS"))
 
 calibrated_wflws_tbl <- submodels_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
@@ -949,7 +950,13 @@ tuned_arima_xgb %>%
   write_rds(here::here("artifacts", "tuned_arima_xgb.rds"))
 
 
-
+tuned_arima_xgb <- 
+ read_rds(here::here("artifacts", "tuned_arima_xgb.rds"))
+tuned_xgb <- 
+read_rds(here::here("artifacts", "tuned_xgb.rds"))
+tuned_rf <- 
+  read_rds(here::here("artifacts", "tuned_rf.rds"))
+submodels_tbl <- read_rds(here::here("artifacts","submodels.RDS"))
 
 # 04  CALIBRATION -------------
 submodels_tbl # modelos originais
@@ -964,7 +971,8 @@ submodels_all_tbl <- modeltime_table(
   update_model_description(3, "XGBOOST ERRORS - Tuned") %>%  
   combine_modeltime_tables(submodels_tbl)
 
-submodels_all_tbl
+submodels_all_tbl %>% 
+  write_rds(here::here("artifacts","submodels_all_tbl.RDS"))
 
 submodels_all_tbl
 
@@ -1017,10 +1025,23 @@ submodels_all_tbl %>%
   write_rds(here::here("artifacts",
                        "submodels_all_tbl.rds"))
 
+submodels_all_tbl <- 
+  read_rds(here::here("artifacts","submodels_all_tbl.RDS"))
+
+workflow_all_artifacts <- 
+  read_rds(here::here("artifacts",
+                       "workflows_NonandTuned_artifacts_list.rds"))
+artifacts <- 
+  read_rds(
+    here::here(
+      "artifacts",
+      "feature_engineering_artifacts_list.rds"
+    )
+  )
 
 # 05 ENSEMBLES ------------------------
 library(modeltime.ensemble)
-calibration_tbl <- read_rds(here::here("data", "artifacts", "credito","workflows_NonandTuned_artifacts_list.rds"))
+calibration_tbl <- read_rds(here::here("artifacts","workflows_NonandTuned_artifacts_list.rds"))
 calibration_tbl <- calibration_tbl$calibration
 calibration_tbl %>%
   modeltime_accuracy() %>%
@@ -1037,12 +1058,12 @@ calibration_tbl %>%
   modeltime_accuracy() %>%
   mutate(rank = min_rank(-rmse))
 
-loadings_tbl <- submodels_tbl %>%
+loadings_tbl <- submodels_all_tbl %>%
   modeltime_accuracy(testing(splits)) %>%
   mutate(rank = min_rank(-rmse)) %>%
   select(.model_id, rank)
 
-ensemble_fit_wt <- submodels_tbl %>%
+ensemble_fit_wt <- submodels_all_tbl %>%
   ensemble_weighted(loadings = loadings_tbl$rank)
 
 ensemble_fit_wt
@@ -1067,8 +1088,8 @@ calibration_all_tbl <- modeltime_table(
   ensemble_fit_median,
   ensemble_fit_wt
 ) %>%
-  modeltime_calibrate(testing(splits)) %>%
-  combine_modeltime_tables(calibration_tbl)
+combine_modeltime_tables(calibration_tbl)  %>%   
+  modeltime_calibrate(testing(splits)) 
 
 calibration_all_tbl %>%
   modeltime_accuracy(testing(splits)) %>%
@@ -1081,11 +1102,13 @@ calibration_all_tbl %>%
 
 
 
+calibration_all_tbl %>% write_rds(
+  here::here("artifacts","calibration_ensemble_all_tbl.RDS"))
 
-
+calibration_all_tbl <- read_rds(
+  here::here("artifacts","calibration_ensemble_all_tbl.RDS"))
 
 ## forecast ----------------------
-
 plan(
   strategy = cluster,
   workers  = parallel::makeCluster(n_cores)
@@ -1122,7 +1145,6 @@ forecast_stacking_tbl |> View()
 plan(sequential)
 
 forecast_stacking_tbl |> names()
-forecast_stacking_tbl |> View()
 
 lforecasts <- lapply(X = 1:length(total_uf), FUN = function(x) {
   forecast_stacking_tbl %>%
@@ -1156,4 +1178,11 @@ forecast_stacking_tbl |>
   saveRDS(here::here(
     "artifacts",
     "credito_forecast_ml.RDS"))
+
+forecast_stacking_tbl %>% 
+  filter(.model_desc %in% c("ACTUAL","ENSEMBLE (MEAN): 6 MODELS")) %>%
+  group_by(.index) %>% 
+  summarise(.value = sum(.value)) %>% 
+  plot_time_series(.date_var = .index,
+                   .value = .value)
 

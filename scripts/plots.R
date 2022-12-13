@@ -19,3 +19,27 @@ nest_f %>%
   summarise(.value = sum(.value)) %>% 
   plot_time_series(.date_var = .index,
                    .value = .value)
+
+ml_f <- read_rds(here::here(
+  "artifacts",
+  "credito_forecast_ml.RDS"))
+ml_f %>% 
+filter(.model_desc %in% c("ACTUAL","ENSEMBLE (MEAN): 6 MODELS")) %>%
+  group_by(.index) %>% 
+  summarise(.value = sum(.value)) %>% 
+  plot_time_series(.date_var = .index,
+                   .value = .value)
+
+
+ml_f_f <- 
+read_rds(here::here(
+       "artifacts",
+       "filtered_credito_forecast_ml.RDS"))
+
+
+ml_f_f %>% 
+  filter(.model_desc %in% c("ACTUAL","ENSEMBLE (MEAN): 6 MODELS")) %>%
+  group_by(.index) %>% 
+  summarise(.value = sum(.value)) %>% 
+  plot_time_series(.date_var = .index,
+                   .value = .value)
