@@ -52,6 +52,31 @@ my_tbl %>%
 my_tbl %>% 
   plot_acf_diagnostics(data_ref,credito)
 
+
+## antes de brincar com modelagem,lembro que os dados do
+## ESTBAN são bastante concentrados, vamos ver isso?
+## São paulo concentra a maior parte do mercado
+## São paulo possui 60% do mercado de crédito
+library(ggplot2)
+library(forcats)
+my_tbl_uf %>% ungroup() %>% 
+  filter(data_ref == max(my_tbl_uf$data_ref)) %>% 
+  slice_max(credito,n=10) %>% 
+  mutate(uf = fct_reorder(uf, desc(credito))) %>% 
+  ggplot(aes(x = uf,y = credito))+
+  geom_bar(stat="identity",fill="#f68060", alpha=.6, width=.4)+
+  #coord_flip() +
+  theme_bw()
+  
+my_tbl_uf %>% 
+  ungroup() %>% 
+  filter(data_ref == max(my_tbl_uf$data_ref)) %>% 
+  slice_max(credito,n=10) %>% 
+  mutate(mercado = sum(credito),
+         prop = round(credito/mercado*100,1)) %>% 
+  select(-mercado)
+
+
 ## Temos alguma ideia sobre nossa série, mas será que um modelo
 ## linear ajusta bem? Pra isso vamos criar algumas features
 ## clássicas, baseadas na série temporal. Desde features clássicas,

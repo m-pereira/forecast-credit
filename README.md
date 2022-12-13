@@ -27,7 +27,12 @@ Ainda explorando o mercado como um todo, estima-se um modelo linear simples, usa
 
 ![alt text](https://github.com/m-pereira/forecast-credit/blob/main/lm_classic.png)
 
-A previsão pelo ensemble de modelos é um mercado em que se recupera da queda que dos últimos dois meses observados, asism os modelos parecem captar a tendência da série do do mercado de crédito.
+A previsão pelo ensemble de modelos por UF, apresenta  um mercado em que se recupera da queda que dos últimos dois meses observados, assim os modelos parecem captar a tendência da série do mercado de crédito.
 
 ![alt text](https://github.com/m-pereira/forecast-credit/blob/main/forecast-ensemble.png)
+
+
+Já o modelo de previsão por Ensemble de Machine learning
+
+
 
