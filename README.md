@@ -1,5 +1,5 @@
 
-# forecast-credit
+# Forecast do mercado de crédito
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -49,7 +49,7 @@ Para efeitos de comparação fiz os mesmos modelos sem as duas últimas observa�
 ![alt text](https://github.com/m-pereira/forecast-credit/blob/main/ML_f_filtered.png)
 
 
-Por questões bônus, recordei o quanto o mercado de crédito é concentrado segundo os dados do ESBTAN. Isso pode ser visto na figura abaixo, a UF de São Paulo (35) concentra cerca de 60% do mercado de crédito, a segunda UF que mais concentra crédito é Rio de Janeiro (31) que concentra "apenas" 7,6% desse mercado. Isso afeta bastante a projeção agregada, pois exige que tenhamos atenção sobre como o modelo prevê os dados para essa UF.
+Ainda, recordei o quanto o mercado de crédito é concentrado segundo os dados do ESBTAN. Isso pode ser visto na figura abaixo, a UF de São Paulo (35) concentra cerca de 60% do mercado de crédito, a segunda UF que mais concentra crédito é Rio de Janeiro (31) que concentra "apenas" 7,6% desse mercado. Isso afeta bastante a projeção agregada, pois exige que tenhamos atenção sobre como o modelo prevê os dados para essa UF.
 
 
 ![alt text](https://github.com/m-pereira/forecast-credit/blob/main/conc.png)
