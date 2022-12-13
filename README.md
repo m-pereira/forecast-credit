@@ -4,6 +4,8 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
+![alt text](https://github.com/m-pereira/forecast-credit/blob/main/forecast.png)
+
 Cada vez mais empresas previsam de previsões em centenas e até milhares de produtos, entretanto fazer previsões com qualidade não é tão fácil. Passei por situações assim algumas vezes e acho duas abordagens muito interessantes para essa atividade: `Nested Forecast` que cria modelo por entidade, no caso unidade federativa e o uso de ML em modelos globais que cria um modelo e usa a informação da UF para a previsão. 
 
 Nesse projeto <https://github.com/m-pereira/forecast-credit> aplico de forma prática esses conceitos, realizando previsões sobre o mercado de crédito para o próximo ano e explicando passo a passo os prós e contras de cada decisão tomada. 
@@ -40,7 +42,7 @@ A previsão pelo ensemble de modelos por UF, apresenta  um mercado em que se rec
 
 Já o modelo de previsão por Ensemble de Machine learning (Random Forest, XGBOOST e ARIMA + XGBOOST). Resumidamente são criados 3 modelos, que são tunados e agregados por média. Na prática os modelos de machine learning performaram muito mal com essas duas últimas observações viesadas.
 
-![alt text](https://github.com/m-pereira/forecast-credit/blob/main/forecast-ensemble.png)
+![alt text](https://github.com/m-pereira/forecast-credit/blob/main/ML.png)
 
 Para efeitos de comparação fiz os mesmos modelos sem as duas últimas observações. O modelo de Machine Learning capta perfeitamente a tendência dos dados, replicando pro futuro. No caso, é uma boa projeção.
 
