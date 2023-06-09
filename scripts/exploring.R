@@ -345,7 +345,6 @@ tbats_table |>
   plot_modeltime_forecast()
 
 
-
 ## modeltime table
 submodels_tbl <- modeltime_table(
 #  wflw_fit_prophet, # vou deixar o prophet de lado
