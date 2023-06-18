@@ -106,3 +106,5 @@ selic_final %>%
   geom_line(aes(y = selic_ajustada), color = "steelblue")+
   
   theme_minimal()
+
+selic_final %>% saveRDS(here::here("data","selic.RDS"))
