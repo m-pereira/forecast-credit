@@ -6,22 +6,36 @@ my_tbl_uf <-
   readRDS( here::here("data","cleaned.RDS"))  
 
 my_tbl_uf %>% glimpse()
+my_tbl_uf %>% select(data_ref) %>% tail()
 selic <- 
   readRDS( here::here("data","selic.RDS"))   %>% 
   mutate(data_ref = as.Date(paste0(lubridate::year(date),"-",
-                          lubridate::month(date),"-",
-                          "01"
+                                   lubridate::month(date),"-",
+                                   "01"
   ))) %>% select(-date)
-my_tbl_uf <- 
-my_tbl_uf %>% inner_join(selic) 
- 
+
+selic_pessimista <-
+  selic %>%
+  mutate(
+    selic = ifelse(data_ref> as.Date("2024-01-01"),selic+5,selic))
+
+selic_otimista <-
+  selic %>%
+  mutate(
+    selic = ifelse(data_ref> as.Date("2024-01-01"),selic-5,selic))
+
+selic
+my_tbl_uf <-
+  my_tbl_uf %>% inner_join(selic)
+selic_future <-
+  bind_rows(selic,selic_pessimista,selic_otimista)
 FORECAST_HORIZON <- 12
 
-
+#my_tbl_uf <- my_tbl_uf %>% filter(uf %in% c("11","27","15"))
 ## split data -------------
 my_tbl_nest <-
   my_tbl_uf %>%
-    group_by(uf) %>%
+  group_by(uf) %>%
   extend_timeseries(
     .id_var = uf,
     .date_var = data_ref,
@@ -32,7 +46,7 @@ my_tbl_nest <-
     .length_future = FORECAST_HORIZON
   ) %>%
   split_nested_timeseries(
-    .length_test = 12
+    .length_test = 16
   )
 
 my_tbl_nest
@@ -40,10 +54,12 @@ my_tbl_nest %>% glimpse()
 my_tbl_nest$.actual_data[[1]]
 my_tbl_nest$.future_data[[1]]
 my_tbl_nest <- 
-my_tbl_nest %>% 
+  my_tbl_nest %>% 
   mutate(
-    .future_data = map(.future_data,~select(.,data_ref,credito)),
-    .future_data = map(.future_data, ~inner_join(.x,selic))
+    .future_data = map(.future_data,
+                       ~select(.,data_ref,credito)),
+    .future_data = map(.future_data, 
+                       ~inner_join(.x,selic_future))
   )
 my_tbl_nest$.future_data[[1]]
 
@@ -115,7 +131,7 @@ wflw_ets <-
 ### teste com 1 serie
 try_sample_tbl <-
   my_tbl_nest %>%
-  slice(25) %>%
+  slice(2) %>%
   modeltime_nested_fit(
     model_list = list(
       wflw_prophet,
@@ -146,10 +162,9 @@ nested_modeltime_tbl <-
   my_tbl_nest %>%
   modeltime_nested_fit(
     model_list = list(
-      wflw_prophet,
-      wflw_arima,
-      #wflw_ets#,
-      #   wflw_arima_boost
+      #wflw_prophet,
+      wflw_arima#,
+     # wflw_ets
     ),
     control = control_nested_fit(
       verbose = TRUE,
@@ -158,10 +173,11 @@ nested_modeltime_tbl <-
   )
 toc()
 parallel_stop()
-
+gc()
 #Finished in: 33.2733 secs.
 nested_modeltime_tbl %>%
   extract_nested_error_report()
+nested_modeltime_tbl$.future_data[[1]]
 
 ## test accuracy ----
 nested_modeltime_tbl
@@ -179,7 +195,7 @@ nested_modeltime_tbl %>%
     .interactive = TRUE
   )
 
-## select best ----------------------------
+## forecast best ----------------------------
 best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
   modeltime_nested_select_best(
     metric                = "rmse", 
@@ -199,9 +215,7 @@ report_nest_best_tbl <-
 
 report_nest_best_tbl |> pull(.model_desc) |> table()
 
-## visualize best models
 
-### refit ----------------------
 
 nest_best_tbl_refit <-
   nest_best_tbl %>%
@@ -211,93 +225,99 @@ nest_best_tbl_refit <-
       allow_par = TRUE
     )
   )
-nest_best_tbl_refit
-nest_best_tbl_refit %>%
-  write_rds(here::here("artifacts","trained-external-reg.RDS"))
-
-# review any errors
-
-# ## visualize
-
-nest_best_tbl_refit %>%
-  extract_nested_future_forecast() %>%
-  group_by(uf) %>%
-  plot_modeltime_forecast()
-
-best_refit_models <- nest_best_tbl_refit %>%
-  extract_nested_best_model_report()
-best_refit_models
+nest_best_tbl_refit$.actual_data[[1]] %>% tail()
 
 
-
-# basic forecast ----
-forecast_tbl <-
-  nest_best_tbl_refit %>%
-  extract_nested_future_forecast()
-
-
-## Ensemble -----------------
-library(modeltime.ensemble)
-
-nested_ensemble_tbl_mean <- 
-  nested_modeltime_tbl %>%
-  ensemble_nested_average(
-    type           = "mean", 
-    keep_submodels = TRUE
-  )
-nested_ensemble_tbl_mean
-## select best
-nested_ensemble_tbl_mean  %>%
-  extract_nested_test_accuracy() %>%
-  group_by(uf) %>%
-  table_modeltime_accuracy(.interactive = FALSE)
-
-
-#
-best_nested_modeltime_tbl <-
-  nested_ensemble_tbl_mean %>%
-  modeltime_nested_select_best(
-    metric                = "rmse",
-    minimize              = TRUE,
-    filter_test_forecasts = TRUE
-  )
-
-best_nested_modeltime_tbl %>% 
-  extract_nested_best_model_report() %>%
-  table_modeltime_accuracy(.interactive = FALSE)
-
-best_nested_modeltime_tbl %>%
-  extract_nested_test_forecast() %>%
-  group_by(uf) %>%
-  plot_modeltime_forecast(
-    .facet_ncol  = 2,
-    .interactive = FALSE
-  )
-
-
-# forecast -----------------------
-nested_modeltime_refit_tbl <- nested_ensemble_tbl_mean %>%
-  modeltime_nested_refit(
-    control = control_nested_refit(verbose = TRUE)
-  )
-
-nested_modeltime_refit_tbl
-nested_modeltime_refit_tbl %>%
-  extract_nested_future_forecast() %>%
-  group_by(uf) %>%
-  plot_modeltime_forecast(
-    .interactive = TRUE,
-    .facet_ncol  = 2
-  )
-
-nested_modeltime_refit_tbl %>%
-  write_rds(here::here("artifacts","trained-nested-external.RDS"))
-
-nested_modeltime_refit_tbl %>%
+nest_best_tbl_refit %>% 
   extract_nested_future_forecast() %>% 
-  saveRDS(here::here("artifacts",
-                     "nested_external.RDS"))
-my_forecast <- 
-nested_modeltime_refit_tbl %>%
-  extract_nested_future_forecast()
-my_forecast %>% View()
+  filter(uf == "11",
+         .key == "prediction") %>% 
+  View()
+
+reps <- nest_best_tbl_refit %>% pull(uf) %>% length()
+
+cenarios <- rep(c("selic base","selic pessimista","selic otimista"),
+    reps * FORECAST_HORIZON)
+
+my_scenario_tbl <- 
+nest_best_tbl_refit %>% 
+  extract_nested_future_forecast()  %>% 
+  filter(.key == "prediction") %>% 
+  mutate(
+    cenario = cenarios
+  ) %>% 
+  bind_rows(
+    nest_best_tbl_refit %>% 
+    extract_nested_future_forecast()  %>% 
+      filter(.key != "prediction") %>% 
+      mutate(
+        cenario = "historico"
+      )
+    
+  )
+my_scenario_tbl %>% View()
+
+?plot_modeltime_forecast
+
+f_cenario_base <- 
+my_scenario_tbl %>% 
+  filter(cenario %in% c("historico","selic base")) %>% 
+  group_by(uf) %>% 
+  plot_modeltime_forecast(
+    .title = "Cenario Base",
+    .interactive = FALSE
+    # .facet_ncol = 3,
+    # .facet_nrow = 3
+  ) 
+
+f_cenario_pessimista <- 
+  my_scenario_tbl %>% 
+  filter(cenario %in% c("historico","selic pessimista")) %>% 
+  group_by(uf) %>% 
+  plot_modeltime_forecast(
+    .title = "Cenario pessimista",
+    .interactive = FALSE    
+    # .facet_ncol = 3,
+    # .facet_nrow = 3
+  ) 
+
+f_cenario_otimista <- 
+  my_scenario_tbl %>% 
+  filter(cenario %in% c("historico","selic otimista")) %>% 
+  group_by(uf) %>% 
+  plot_modeltime_forecast(
+    .title = "Cenario otimista",
+     .interactive = FALSE
+    # .facet_ncol = 3,
+    # .facet_nrow = 3
+  ) 
+
+library(patchwork) # for putting ggplot objects together 
+wrap_plots(f_cenario_base, f_cenario_pessimista, f_cenario_otimista)
+
+
+my_scenario_tbl %>% 
+  group_by(uf) %>% 
+  plot_time_series(
+    .date_var = .index,
+    .value = .value,
+    .color_var = cenario,
+    .facet_ncol = 2)
+
+library(ggplot2)
+library(tidyquant)
+my_scenario_tbl %>% 
+  #mutate(.value = exp(.value)) %>% 
+  ggplot(aes(x = .index,y=.value,color=cenario)) +
+  geom_line() +
+#  geom_smooth(method = "loess") +
+  labs(title = "Forecasting mercado",
+       subtitle = "Comparaçao de múltiplos cenários",
+       caption = "A maior confiança é no cenário base",
+       x = "", y = "mercado",
+       color = "cenario") +
+  facet_wrap(~ uf,scales = 'free')+
+  theme_tq() +
+  scale_color_tq() +
+  scale_y_continuous(labels = scales::dollar)
+
