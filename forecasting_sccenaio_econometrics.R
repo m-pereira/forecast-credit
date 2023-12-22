@@ -163,8 +163,8 @@ nested_modeltime_tbl <-
   modeltime_nested_fit(
     model_list = list(
       #wflw_prophet,
-      wflw_arima#,
-     # wflw_ets
+      wflw_arima,
+     wflw_ets
     ),
     control = control_nested_fit(
       verbose = TRUE,
@@ -199,10 +199,10 @@ nested_modeltime_good_tbl <-
   nested_modeltime_tbl %>% 
   mutate(
     .modeltime_residuals = map(.modeltime_tables ,
-                               ~modeltime_residuals(.)),
+                       ~modeltime_residuals(.)),
     .residuals = map(.modeltime_tables ,
-                     ~modeltime_residuals(.) %>% 
-                       pull(.residuals)),
+                               ~modeltime_residuals(.) %>% 
+                                 pull(.residuals)),
     
   )
 
@@ -214,9 +214,48 @@ nested_modeltime_good_tbl <-
                        pluck("p.value"))
   )
 
-
+?unnest
+nested_modeltime_good_tbl$.residuals[1]
 nested_modeltime_good_tbl %>% 
-  mutate(.p_value  = unnest(.ljung_box))
+  select(uf, .modeltime_tables,
+         .residuals) %>% 
+  unnest(.modeltime_tables) %>% 
+  mutate(test = Box.test(as.vector(.residuals)))
+
+mutate(
+    .modeltime_residuals = (.modeltime_tables ,
+                               ~modeltime_residuals(.)),
+    .residuals = map(.modeltime_tables ,
+                     ~modeltime_residuals(.) %>% 
+                       pull(.residuals)),
+    
+  )
+  
+mutate(.p_value  = unnest(.ljung_box),
+         .modeltime_tables = unn)
+nested_modeltime_good_tbl %>% 
+  unnest(.ljung_box) %>% View()
+
+nested_modeltime_good_tbl$.ljung_box[1] 
+
+?Box.test
+serial.test 
+?modeltime_residuals_test
+forecast::gghistogram()
+Box.test()
+?vars::serial.test()
+nested_modeltime_good_tbl$.residuals
+nested_modeltime_good_tbl$.residuals
+
+
+teste <- 
+nested_modeltime_good_tbl$.modeltime_tables[1]
+teste %>% unnest(.calibration_data)
+
+attr_getter(nested_modeltime_tbl)
+
+modeltime_residuals()
+extract_nested_test_accuracy()
 
 
 ## forecast best ----------------------------
@@ -261,10 +300,10 @@ nest_best_tbl_refit %>%
 reps <- nest_best_tbl_refit %>% pull(uf) %>% length()
 
 cenarios <- rep(c("selic base","selic pessimista","selic otimista"),
-    reps * FORECAST_HORIZON)
+                reps * FORECAST_HORIZON)
 
 my_scenario_tbl <- 
-nest_best_tbl_refit %>% 
+  nest_best_tbl_refit %>% 
   extract_nested_future_forecast()  %>% 
   filter(.key == "prediction") %>% 
   mutate(
@@ -272,7 +311,7 @@ nest_best_tbl_refit %>%
   ) %>% 
   bind_rows(
     nest_best_tbl_refit %>% 
-    extract_nested_future_forecast()  %>% 
+      extract_nested_future_forecast()  %>% 
       filter(.key != "prediction") %>% 
       mutate(
         cenario = "historico"
@@ -284,7 +323,7 @@ my_scenario_tbl %>% View()
 ?plot_modeltime_forecast
 
 f_cenario_base <- 
-my_scenario_tbl %>% 
+  my_scenario_tbl %>% 
   filter(cenario %in% c("historico","selic base")) %>% 
   group_by(uf) %>% 
   plot_modeltime_forecast(
@@ -311,7 +350,7 @@ f_cenario_otimista <-
   group_by(uf) %>% 
   plot_modeltime_forecast(
     .title = "Cenario otimista",
-     .interactive = FALSE
+    .interactive = FALSE
     # .facet_ncol = 3,
     # .facet_nrow = 3
   ) 
@@ -334,7 +373,7 @@ my_scenario_tbl %>%
   #mutate(.value = exp(.value)) %>% 
   ggplot(aes(x = .index,y=.value,color=cenario)) +
   geom_line() +
-#  geom_smooth(method = "loess") +
+  #  geom_smooth(method = "loess") +
   labs(title = "Forecasting mercado",
        subtitle = "Comparaçao de múltiplos cenários",
        caption = "A maior confiança é no cenário base",
