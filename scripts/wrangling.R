@@ -1,3 +1,4 @@
+library(dplyr)
 ## buscando as funçõees usadas
 source(here::here("scripts","functions.R"))
 ## importando 36 amostras dos dados 
